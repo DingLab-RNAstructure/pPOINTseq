@@ -1,0 +1,7 @@
+sample	bam_file	out_name	replicate	enabled
+Warm1	Warm1.nonpolya.bam	Warm1	rep1	true
+Warm2	Warm2.nonpolya.bam	Warm2	rep2	true
+Warm3	Warm3.nonpolya.bam	Warm3	rep3	true
+Cold1	Cold1.nonpolya.bam	Cold1	rep1	true
+Cold2	Cold2.nonpolya.bam	Cold2	rep2	true
+Cold3	Cold3.nonpolya.bam	Cold3	rep3	true
