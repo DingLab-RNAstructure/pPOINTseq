@@ -125,7 +125,7 @@ def metric_order(metrics: list[str]) -> list[str]:
 def sample_differences(
     n_event: np.ndarray,
     n_valid: np.ndarray,
-    is_nv: np.ndarray,
+    is_warm: np.ndarray,
     n_draw: int,
     n_sim: int,
     rng: np.random.Generator,
@@ -146,13 +146,13 @@ def sample_differences(
     else:
         hits = rng.binomial(n_draw, shared_rate, size=(n_sim, len(n_event)))
     rates = hits / n_draw
-    return rates[:, is_nv].mean(axis=1) - rates[:, ~is_nv].mean(axis=1)
+    return rates[:, is_warm].mean(axis=1) - rates[:, ~is_warm].mean(axis=1)
 
 
-def analytical_p(delta: float, n_draw: int, n_nv: int, n_c5: int, shared_rate: float) -> tuple[float, float]:
+def analytical_p(delta: float, n_draw: int, n_warm: int, n_cold: int, shared_rate: float) -> tuple[float, float]:
     """Return the normal z and one-sided p-value for a shared read rate."""
     variance = shared_rate * (1.0 - shared_rate) / n_draw
-    se = np.sqrt(variance / n_nv + variance / n_c5)
+    se = np.sqrt(variance / n_warm + variance / n_cold)
     if se == 0:
         return np.nan, np.nan
     z_stat = delta / se
@@ -170,26 +170,26 @@ def test_metric(
     sub = counts.loc[counts["metric"].eq(metric)].sort_values("sample")
     n_event = sub["n_event"].to_numpy()
     n_valid = sub["n_valid"].to_numpy()
-    is_nv = sub["group"].eq("Warm").to_numpy()
+    is_warm = sub["group"].eq("Warm").to_numpy()
     observed_rate = n_event / n_valid
-    delta = float(observed_rate[is_nv].mean() - observed_rate[~is_nv].mean())
+    delta = float(observed_rate[is_warm].mean() - observed_rate[~is_warm].mean())
     shared_rate = float(n_event.sum() / n_valid.sum())
-    observed_draws = sample_differences(n_event, n_valid, is_nv, n_draw, n_sim, rng, None)
+    observed_draws = sample_differences(n_event, n_valid, is_warm, n_draw, n_sim, rng, None)
     null_draws = sample_differences(
-        n_event, n_valid, is_nv, n_draw, n_sim, rng, shared_rate
+        n_event, n_valid, is_warm, n_draw, n_sim, rng, shared_rate
     )
-    z_stat, analytical = analytical_p(delta, n_draw, int(is_nv.sum()), int((~is_nv).sum()), shared_rate)
+    z_stat, analytical = analytical_p(delta, n_draw, int(is_warm.sum()), int((~is_warm).sum()), shared_rate)
     monte_carlo = float((np.sum(null_draws >= delta) + 1) / (n_sim + 1))
     summary = {
         "metric": metric,
         "n_draw": n_draw,
         "n_sim": n_sim,
-        "n_event_Warm": int(n_event[is_nv].sum()),
-        "n_valid_Warm": int(n_valid[is_nv].sum()),
-        "n_event_Cold": int(n_event[~is_nv].sum()),
-        "n_valid_Cold": int(n_valid[~is_nv].sum()),
-        "mean_Warm": float(observed_rate[is_nv].mean()),
-        "mean_Cold": float(observed_rate[~is_nv].mean()),
+        "n_event_Warm": int(n_event[is_warm].sum()),
+        "n_valid_Warm": int(n_valid[is_warm].sum()),
+        "n_event_Cold": int(n_event[~is_warm].sum()),
+        "n_valid_Cold": int(n_valid[~is_warm].sum()),
+        "mean_Warm": float(observed_rate[is_warm].mean()),
+        "mean_Cold": float(observed_rate[~is_warm].mean()),
         "delta_Warm_minus_Cold": delta,
         "resample_ci_low": float(np.quantile(observed_draws, 0.025)),
         "resample_ci_high": float(np.quantile(observed_draws, 0.975)),

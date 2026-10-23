@@ -28,7 +28,7 @@ from plot_gene_reads import (
     _sort_reads_for_strand,
 )
 from project_config import BAM_BY_SAMPLE, REF_DIR, RESULT_DIRS, SAMPLES, classify_tsv
-from _find_nv_consec_c5_down import (
+from _find_warm_consec_cold_down import (
     EXCLUDED_CLASSES,
     RI_TOKEN,
     consecutive_pairs,
@@ -140,15 +140,15 @@ def plot_gene(gene_id: str, id_map: dict[str, set[str]]) -> None:
     gene_start = int(gene_model["start"].min())
     gene_end = int(gene_model["end"].max())
     strand = str(gene_model["strand"].iloc[0])
-    nv_reads = fetch_group_reads(gene_id, "Warm", id_map, chrom, gene_start, gene_end, strand)
-    c5_reads = fetch_group_reads(gene_id, "Cold", id_map, chrom, gene_start, gene_end, strand)
+    warm_reads = fetch_group_reads(gene_id, "Warm", id_map, chrom, gene_start, gene_end, strand)
+    cold_reads = fetch_group_reads(gene_id, "Cold", id_map, chrom, gene_start, gene_end, strand)
     print(
         f"{gene_id}  strand={strand}  "
-        f"Warm consec ids={sum(len(id_map[s]) for s in SAMPLE_GROUPS['Warm']):,} plotted={len(nv_reads)}  "
-        f"Cold consec ids={sum(len(id_map[s]) for s in SAMPLE_GROUPS['Cold']):,} plotted={len(c5_reads)}",
+        f"Warm consec ids={sum(len(id_map[s]) for s in SAMPLE_GROUPS['Warm']):,} plotted={len(warm_reads)}  "
+        f"Cold consec ids={sum(len(id_map[s]) for s in SAMPLE_GROUPS['Cold']):,} plotted={len(cold_reads)}",
         flush=True,
     )
-    all_plotted = nv_reads + c5_reads
+    all_plotted = warm_reads + cold_reads
     min_pos = gene_start
     max_pos = gene_end
     if all_plotted:
@@ -160,21 +160,21 @@ def plot_gene(gene_id: str, id_map: dict[str, set[str]]) -> None:
         if ("exon" in str(r.feature) or "intron" in str(r.feature))
     ]
     boundary_bp = 200
-    n_nv, n_c5 = max(len(nv_reads), 1), max(len(c5_reads), 1)
-    fig_h = min(12.0, 2.2 + 0.09 * (len(nv_reads) + len(c5_reads)))
+    n_warm, n_cold = max(len(warm_reads), 1), max(len(cold_reads), 1)
+    fig_h = min(12.0, 2.2 + 0.09 * (len(warm_reads) + len(cold_reads)))
     fig, axes = plt.subplots(
         3,
         1,
         figsize=(10.0, fig_h),
-        gridspec_kw={"height_ratios": [n_nv, n_c5, 8], "hspace": 0.04},
+        gridspec_kw={"height_ratios": [n_warm, n_cold, 8], "hspace": 0.04},
         sharex=True,
     )
     _plot_reads_on_ax(
-        axes[0], nv_reads, gene_segments, min_pos, max_pos, boundary_bp,
+        axes[0], warm_reads, gene_segments, min_pos, max_pos, boundary_bp,
         title=f"{gene_id}   Warm  consecutive intron-retention reads",
     )
     _plot_reads_on_ax(
-        axes[1], c5_reads, gene_segments, min_pos, max_pos, boundary_bp,
+        axes[1], cold_reads, gene_segments, min_pos, max_pos, boundary_bp,
         title="Cold  consecutive intron-retention reads",
     )
     _draw_ri_gene_model(axes[2], gene_model, min_pos, max_pos, boundary_bp)

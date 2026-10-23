@@ -119,13 +119,13 @@ def count_sample(sample: str) -> pd.DataFrame:
             n_consec[gid] += 1
             max_run[gid] = max(max_run[gid], longest_run(rii))
     rows = []
-    for gid, nv in n_valid.items():
+    for gid, warm in n_valid.items():
         rows.append(
             {
                 "sample": sample,
                 "group": GROUP_BY_SAMPLE[sample],
                 "gene_id": gid,
-                "n_valid": nv,
+                "n_valid": warm,
                 "n_ri": n_ri[gid],
                 "n_consec": n_consec[gid],
                 "max_run": max_run[gid],
@@ -157,21 +157,21 @@ def main() -> None:
     wide.columns = [f"{metric}.{sample}" for metric, sample in wide.columns]
     wide = wide.reset_index()
 
-    wide["nv_mean_n_valid"] = mean_cols(wide, "n_valid", Warm_SAMPLES)
-    wide["c5_mean_n_valid"] = mean_cols(wide, "n_valid", Cold_SAMPLES)
-    wide["nv_mean_n_consec"] = mean_cols(wide, "n_consec", Warm_SAMPLES)
-    wide["c5_mean_n_consec"] = mean_cols(wide, "n_consec", Cold_SAMPLES)
-    wide["nv_mean_n_ri"] = mean_cols(wide, "n_ri", Warm_SAMPLES)
-    wide["c5_mean_n_ri"] = mean_cols(wide, "n_ri", Cold_SAMPLES)
-    wide["nv_mean_rate"] = mean_cols(wide, "rate", Warm_SAMPLES)
-    wide["c5_mean_rate"] = mean_cols(wide, "rate", Cold_SAMPLES)
-    wide["nv_max_run"] = pd.concat([wide[f"max_run.{s}"] for s in Warm_SAMPLES], axis=1).max(axis=1)
-    wide["c5_max_run"] = pd.concat([wide[f"max_run.{s}"] for s in Cold_SAMPLES], axis=1).max(axis=1)
-    wide["nv_n_reps_consec"] = sum((wide[f"n_consec.{s}"].fillna(0) > 0).astype(int) for s in Warm_SAMPLES)
-    wide["c5_n_reps_consec"] = sum((wide[f"n_consec.{s}"].fillna(0) > 0).astype(int) for s in Cold_SAMPLES)
-    wide["rate_diff"] = wide["nv_mean_rate"] - wide["c5_mean_rate"]
-    wide["rate_ratio"] = wide["c5_mean_rate"] / wide["nv_mean_rate"].clip(lower=1e-9)
-    wide["n_consec_diff"] = wide["nv_mean_n_consec"] - wide["c5_mean_n_consec"]
+    wide["warm_mean_n_valid"] = mean_cols(wide, "n_valid", Warm_SAMPLES)
+    wide["cold_mean_n_valid"] = mean_cols(wide, "n_valid", Cold_SAMPLES)
+    wide["warm_mean_n_consec"] = mean_cols(wide, "n_consec", Warm_SAMPLES)
+    wide["cold_mean_n_consec"] = mean_cols(wide, "n_consec", Cold_SAMPLES)
+    wide["warm_mean_n_ri"] = mean_cols(wide, "n_ri", Warm_SAMPLES)
+    wide["cold_mean_n_ri"] = mean_cols(wide, "n_ri", Cold_SAMPLES)
+    wide["warm_mean_rate"] = mean_cols(wide, "rate", Warm_SAMPLES)
+    wide["cold_mean_rate"] = mean_cols(wide, "rate", Cold_SAMPLES)
+    wide["warm_max_run"] = pd.concat([wide[f"max_run.{s}"] for s in Warm_SAMPLES], axis=1).max(axis=1)
+    wide["cold_max_run"] = pd.concat([wide[f"max_run.{s}"] for s in Cold_SAMPLES], axis=1).max(axis=1)
+    wide["warm_n_reps_consec"] = sum((wide[f"n_consec.{s}"].fillna(0) > 0).astype(int) for s in Warm_SAMPLES)
+    wide["cold_n_reps_consec"] = sum((wide[f"n_consec.{s}"].fillna(0) > 0).astype(int) for s in Cold_SAMPLES)
+    wide["rate_diff"] = wide["warm_mean_rate"] - wide["cold_mean_rate"]
+    wide["rate_ratio"] = wide["cold_mean_rate"] / wide["warm_mean_rate"].clip(lower=1e-9)
+    wide["n_consec_diff"] = wide["warm_mean_n_consec"] - wide["cold_mean_n_consec"]
     wide["locus"] = wide["gene_id"].str.replace(r"\.\d+$", "", regex=True)
 
     bed_ann = n_intron_from_bed(REF_DIR / "exon_intron_pos.chr.bed")
@@ -179,37 +179,37 @@ def main() -> None:
 
     outdir = RESULT_DIRS["alternative_splicing"]
     outdir.mkdir(parents=True, exist_ok=True)
-    gene_path = outdir / "consecutive_ri.gene_nv_vs_c5.tsv"
+    gene_path = outdir / "consecutive_ri.gene_warm_vs_cold.tsv"
     wide.sort_values(["rate_diff", "n_consec_diff"], ascending=False).to_csv(
         gene_path, sep="\t", index=False
     )
 
     cand = wide.loc[
-        (wide["nv_n_reps_consec"] == 3)
-        & (wide["nv_mean_n_valid"] >= 30)
-        & (wide["c5_mean_n_valid"] >= 20)
-        & (wide["nv_mean_n_consec"] >= 8)
-        & (wide["nv_mean_rate"] >= 0.05)
+        (wide["warm_n_reps_consec"] == 3)
+        & (wide["warm_mean_n_valid"] >= 30)
+        & (wide["cold_mean_n_valid"] >= 20)
+        & (wide["warm_mean_n_consec"] >= 8)
+        & (wide["warm_mean_rate"] >= 0.05)
         & (wide["rate_ratio"] <= 0.4)
         & (wide["n_intron"].between(3, 15))
     ].copy()
     cand = cand.sort_values(["rate_diff", "n_consec_diff"], ascending=False)
-    cand_path = outdir / "consecutive_ri.nv_present_c5_down.plottable.tsv"
+    cand_path = outdir / "consecutive_ri.warm_present_cold_down.plottable.tsv"
     cand.to_csv(cand_path, sep="\t", index=False)
 
     show_cols = [
         "gene_id",
         "n_intron",
-        "nv_mean_n_valid",
-        "c5_mean_n_valid",
-        "nv_mean_n_consec",
-        "c5_mean_n_consec",
-        "nv_mean_rate",
-        "c5_mean_rate",
+        "warm_mean_n_valid",
+        "cold_mean_n_valid",
+        "warm_mean_n_consec",
+        "cold_mean_n_consec",
+        "warm_mean_rate",
+        "cold_mean_rate",
         "rate_diff",
         "rate_ratio",
-        "nv_max_run",
-        "c5_n_reps_consec",
+        "warm_max_run",
+        "cold_n_reps_consec",
     ]
     print(f"saved {gene_path}", flush=True)
     print(f"saved {cand_path}  n={len(cand)}", flush=True)

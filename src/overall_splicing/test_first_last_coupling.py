@@ -134,16 +134,16 @@ def annotate_replicates(frame: pd.DataFrame) -> pd.DataFrame:
 
 def welch_group_test(values: np.ndarray, groups: np.ndarray, label: str) -> dict:
     """Welch t-test of Warm versus Cold replicate values."""
-    nv = values[groups == "Warm"]
-    c5 = values[groups == "Cold"]
-    t_stat, p_value = stats.ttest_ind(nv, c5, equal_var=False)
+    warm = values[groups == "Warm"]
+    cold = values[groups == "Cold"]
+    t_stat, p_value = stats.ttest_ind(warm, cold, equal_var=False)
     return {
         "test": label,
-        "n_Warm": int(nv.size),
-        "n_Cold": int(c5.size),
-        "mean_Warm": float(np.mean(nv)),
-        "mean_Cold": float(np.mean(c5)),
-        "delta_Warm_minus_Cold": float(np.mean(nv) - np.mean(c5)),
+        "n_Warm": int(warm.size),
+        "n_Cold": int(cold.size),
+        "mean_Warm": float(np.mean(warm)),
+        "mean_Cold": float(np.mean(cold)),
+        "delta_Warm_minus_Cold": float(np.mean(warm) - np.mean(cold)),
         "t": float(t_stat),
         "p": float(p_value),
         "n": np.nan,

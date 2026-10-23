@@ -6,7 +6,7 @@ Three tests:
 1. Library rate. Replicate-level Welch t-test and quasi-binomial GLM on
    consecutive-RI / valid-P5 (and / RI) using consecutive_ri.by_sample.tsv.
 2. Gene rate. Per-transcript quasi-binomial GLM of n_consec / n_valid on
-   group, BH-adjusted, from consecutive_ri.gene_nv_vs_c5.tsv.
+   group, BH-adjusted, from consecutive_ri.gene_warm_vs_cold.tsv.
 3. Same-molecule coupling. For every read that has a spliced/retained call
    on both members of an intron pair, fill a 2x2 table. Adjacent pairs
    (distance = 1) are the consecutive test; distances 2 and 3 are controls.
@@ -77,7 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--gene-table",
         type=Path,
-        default=default_dir / "consecutive_ri.gene_nv_vs_c5.tsv",
+        default=default_dir / "consecutive_ri.gene_warm_vs_cold.tsv",
         help="Per-gene consecutive-RI counts by replicate",
     )
     parser.add_argument(
@@ -157,16 +157,16 @@ def welch_group_test(values, groups, label: str) -> dict:
     """Welch t-test of Warm versus Cold replicate values."""
     values = np.asarray(values, dtype=float)
     groups = np.asarray(groups)
-    nv = values[groups == "Warm"]
-    c5 = values[groups == "Cold"]
-    t_stat, p_value = stats.ttest_ind(nv, c5, equal_var=False)
+    warm = values[groups == "Warm"]
+    cold = values[groups == "Cold"]
+    t_stat, p_value = stats.ttest_ind(warm, cold, equal_var=False)
     return {
         "test": label,
-        "n_Warm": int(nv.size),
-        "n_Cold": int(c5.size),
-        "mean_Warm": float(np.mean(nv)),
-        "mean_Cold": float(np.mean(c5)),
-        "delta_Warm_minus_Cold": float(np.mean(nv) - np.mean(c5)),
+        "n_Warm": int(warm.size),
+        "n_Cold": int(cold.size),
+        "mean_Warm": float(np.mean(warm)),
+        "mean_Cold": float(np.mean(cold)),
+        "delta_Warm_minus_Cold": float(np.mean(warm) - np.mean(cold)),
         "t": float(t_stat),
         "p": float(p_value),
     }
@@ -195,8 +195,8 @@ def quasi_binomial_group(
     """Quasi-binomial GLM: success/total ~ Warm vs Cold, with scale floored at 1."""
     n_fail = n_total - n_success
     endog = np.column_stack([n_success, n_fail])
-    nv = (np.asarray(group) == "Warm").astype(float)
-    design = sm.add_constant(nv)
+    warm = (np.asarray(group) == "Warm").astype(float)
+    design = sm.add_constant(warm)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", PerfectSeparationWarning)
         fit = sm.GLM(endog, design, family=sm.families.Binomial()).fit()
@@ -307,21 +307,21 @@ def test_genes(
     keep = gene_tbl.copy()
     if "n_intron" in keep.columns:
         keep = keep.loc[keep["n_intron"].fillna(0) >= 2]
-    if {"nv_mean_n_valid", "c5_mean_n_valid"}.issubset(keep.columns):
+    if {"warm_mean_n_valid", "cold_mean_n_valid"}.issubset(keep.columns):
         keep = keep.loc[
-            (keep["nv_mean_n_valid"] >= min_reads)
-            & (keep["c5_mean_n_valid"] >= min_reads)
+            (keep["warm_mean_n_valid"] >= min_reads)
+            & (keep["cold_mean_n_valid"] >= min_reads)
         ]
     long = gene_long_table(keep)
     records = []
     for gene_id, frame in long.groupby("gene_id", sort=False):
-        nv = frame.loc[frame["group"].eq("Warm")]
-        c5 = frame.loc[frame["group"].eq("Cold")]
-        if nv["sample"].nunique() < 2 or c5["sample"].nunique() < 2:
+        warm = frame.loc[frame["group"].eq("Warm")]
+        cold = frame.loc[frame["group"].eq("Cold")]
+        if warm["sample"].nunique() < 2 or cold["sample"].nunique() < 2:
             continue
-        if nv["n_valid"].mean() < min_reads or c5["n_valid"].mean() < min_reads:
+        if warm["n_valid"].mean() < min_reads or cold["n_valid"].mean() < min_reads:
             continue
-        if nv["n_consec"].sum() + c5["n_consec"].sum() < min_events:
+        if warm["n_consec"].sum() + cold["n_consec"].sum() < min_events:
             continue
         try:
             glm = quasi_binomial_group(
@@ -333,20 +333,20 @@ def test_genes(
             continue
         if not np.isfinite(glm["p"]):
             continue
-        rate_nv = float(nv["n_consec"].sum() / max(nv["n_valid"].sum(), 1.0))
-        rate_c5 = float(c5["n_consec"].sum() / max(c5["n_valid"].sum(), 1.0))
+        rate_warm = float(warm["n_consec"].sum() / max(warm["n_valid"].sum(), 1.0))
+        rate_cold = float(cold["n_consec"].sum() / max(cold["n_valid"].sum(), 1.0))
         records.append(
             {
                 "gene_id": gene_id,
-                "n_reps_Warm": int(nv["sample"].nunique()),
-                "n_reps_Cold": int(c5["sample"].nunique()),
-                "mean_valid_Warm": float(nv["n_valid"].mean()),
-                "mean_valid_Cold": float(c5["n_valid"].mean()),
-                "n_consec_Warm": float(nv["n_consec"].sum()),
-                "n_consec_Cold": float(c5["n_consec"].sum()),
-                "rate_Warm": rate_nv,
-                "rate_Cold": rate_c5,
-                "delta_rate": rate_nv - rate_c5,
+                "n_reps_Warm": int(warm["sample"].nunique()),
+                "n_reps_Cold": int(cold["sample"].nunique()),
+                "mean_valid_Warm": float(warm["n_valid"].mean()),
+                "mean_valid_Cold": float(cold["n_valid"].mean()),
+                "n_consec_Warm": float(warm["n_consec"].sum()),
+                "n_consec_Cold": float(cold["n_consec"].sum()),
+                "rate_Warm": rate_warm,
+                "rate_Cold": rate_cold,
+                "delta_rate": rate_warm - rate_cold,
                 "coef_Warm": glm["coef_Warm"],
                 "or_Warm_vs_Cold": glm["or_Warm_vs_Cold"],
                 "p": glm["p"],
@@ -608,12 +608,12 @@ def main() -> None:
     gene_path = out_dir / "consecutive_ri.gene_glm.tsv"
     gene_tests.to_csv(gene_path, sep="\t", index=False)
     n_sig = int(gene_tests["significant"].sum()) if not gene_tests.empty else 0
-    n_nv = int((gene_tests["direction"] == "higher_consecutive_in_Warm").sum()) if not gene_tests.empty else 0
-    n_c5 = int((gene_tests["direction"] == "higher_consecutive_in_Cold").sum()) if not gene_tests.empty else 0
+    n_warm = int((gene_tests["direction"] == "higher_consecutive_in_Warm").sum()) if not gene_tests.empty else 0
+    n_cold = int((gene_tests["direction"] == "higher_consecutive_in_Cold").sum()) if not gene_tests.empty else 0
     print(f"[INFO] wrote {gene_path}", file=sys.stderr)
     print(
         f"[INFO] gene GLM tested={len(gene_tests):,} significant={n_sig:,} "
-        f"higher_in_Warm={n_nv:,} higher_in_Cold={n_c5:,}",
+        f"higher_in_Warm={n_warm:,} higher_in_Cold={n_cold:,}",
         file=sys.stderr,
     )
 
@@ -630,29 +630,29 @@ def main() -> None:
         print(f"[INFO] wrote {pair_path}", file=sys.stderr)
         print(f"[INFO] wrote {cluster_path}", file=sys.stderr)
         adj = pair_tbl.loc[pair_tbl["distance"].eq(1)]
-        nv_or = adj.loc[adj["group"].eq("Warm"), "odds_ratio"]
-        c5_or = adj.loc[adj["group"].eq("Cold"), "odds_ratio"]
-        nv_cl = cluster_tbl.loc[cluster_tbl["group"].eq("Warm"), "obs_over_exp"]
-        c5_cl = cluster_tbl.loc[cluster_tbl["group"].eq("Cold"), "obs_over_exp"]
+        warm_or = adj.loc[adj["group"].eq("Warm"), "odds_ratio"]
+        cold_or = adj.loc[adj["group"].eq("Cold"), "odds_ratio"]
+        warm_cl = cluster_tbl.loc[cluster_tbl["group"].eq("Warm"), "obs_over_exp"]
+        cold_cl = cluster_tbl.loc[cluster_tbl["group"].eq("Cold"), "obs_over_exp"]
         extra_rows = [
             welch_group_test(np.log(adj["odds_ratio"]), adj["group"], "log_OR_adjacent_Warm_vs_Cold"),
             welch_group_test(cluster_tbl["obs_over_exp"], cluster_tbl["group"], "obs_over_exp_Warm_vs_Cold"),
-            ttest_vs_value(np.log(nv_or), 0.0, "log_OR_adjacent_Warm_vs_0"),
-            ttest_vs_value(np.log(c5_or), 0.0, "log_OR_adjacent_Cold_vs_0"),
-            ttest_vs_value(nv_cl, 1.0, "obs_over_exp_Warm_vs_1"),
-            ttest_vs_value(c5_cl, 1.0, "obs_over_exp_Cold_vs_1"),
+            ttest_vs_value(np.log(warm_or), 0.0, "log_OR_adjacent_Warm_vs_0"),
+            ttest_vs_value(np.log(cold_or), 0.0, "log_OR_adjacent_Cold_vs_0"),
+            ttest_vs_value(warm_cl, 1.0, "obs_over_exp_Warm_vs_1"),
+            ttest_vs_value(cold_cl, 1.0, "obs_over_exp_Cold_vs_1"),
         ]
         extra = pd.DataFrame(extra_rows)
         extra_path = out_dir / "consecutive_ri.coupling_group_test.tsv"
         extra.to_csv(extra_path, sep="\t", index=False)
         print(f"[INFO] wrote {extra_path}", file=sys.stderr)
         print(
-            f"[INFO] adjacent OR: Warm={nv_or.mean():.3g} Cold={c5_or.mean():.3g} "
+            f"[INFO] adjacent OR: Warm={warm_or.mean():.3g} Cold={cold_or.mean():.3g} "
             f"Welch logOR p={extra_rows[0]['p']:.3g}",
             file=sys.stderr,
         )
         print(
-            f"[INFO] clustering obs/exp: Warm={nv_cl.mean():.3g} Cold={c5_cl.mean():.3g} "
+            f"[INFO] clustering obs/exp: Warm={warm_cl.mean():.3g} Cold={cold_cl.mean():.3g} "
             f"Welch p={extra_rows[1]['p']:.3g}",
             file=sys.stderr,
         )

@@ -42,7 +42,7 @@ def run(script: str, *args: str) -> None:
 # %% cell 1
 _prov.mark(1)
 # Per-gene Warm vs Cold consecutive-RI table and Warm-present / Cold-down candidate list.
-run("_find_nv_consec_c5_down.py")
+run("_find_warm_consec_cold_down.py")
 
 # %% cell 2
 _prov.mark(2)
@@ -64,4 +64,4 @@ run("plot_consecutive_ri_summary.py", "--gene", PANEL_A_GENES[0], "--write-volca
 # %% cell 5
 _prov.mark(5)
 # Gene-reads tracks for Warm-high / Cold-down example genes.
-run("_plot_nv_consec_c5_down.py")
+run("_plot_warm_consec_cold_down.py")

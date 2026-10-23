@@ -620,15 +620,15 @@ gene_start = int(gene_model["start"].min())
 gene_end = int(gene_model["end"].max())
 strand = str(gene_model["strand"].iloc[0])
 ri_ids = _ri_ids_for_gene(ri_gene)
-nv_reads = _fetch_group_ri_reads(ri_gene, "Warm", ri_ids["Warm"], chrom, gene_start, gene_end, strand)
-c5_reads = _fetch_group_ri_reads(ri_gene, "Cold", ri_ids["Cold"], chrom, gene_start, gene_end, strand)
+warm_reads = _fetch_group_ri_reads(ri_gene, "Warm", ri_ids["Warm"], chrom, gene_start, gene_end, strand)
+cold_reads = _fetch_group_ri_reads(ri_gene, "Cold", ri_ids["Cold"], chrom, gene_start, gene_end, strand)
 print(
     f"{ri_gene}  strand={strand}  "
-    f"Warm RI ids={sum(len(v) for v in ri_ids['Warm'].values()):,} plotted={len(nv_reads)}  "
-    f"Cold RI ids={sum(len(v) for v in ri_ids['Cold'].values()):,} plotted={len(c5_reads)}"
+    f"Warm RI ids={sum(len(v) for v in ri_ids['Warm'].values()):,} plotted={len(warm_reads)}  "
+    f"Cold RI ids={sum(len(v) for v in ri_ids['Cold'].values()):,} plotted={len(cold_reads)}"
 )
 
-all_plotted = nv_reads + c5_reads
+all_plotted = warm_reads + cold_reads
 min_pos = gene_start
 max_pos = gene_end
 if all_plotted:
@@ -641,21 +641,21 @@ gene_segments = [
     if ("exon" in str(r.feature) or "intron" in str(r.feature))
 ]
 boundary_bp = 200
-n_nv, n_c5 = max(len(nv_reads), 1), max(len(c5_reads), 1)
-fig_h = min(12.0, 2.2 + 0.09 * (len(nv_reads) + len(c5_reads)))
+n_warm, n_cold = max(len(warm_reads), 1), max(len(cold_reads), 1)
+fig_h = min(12.0, 2.2 + 0.09 * (len(warm_reads) + len(cold_reads)))
 fig, axes = plt.subplots(
     3,
     1,
     figsize=(10.0, fig_h),
-    gridspec_kw={"height_ratios": [n_nv, n_c5, 8], "hspace": 0.04},
+    gridspec_kw={"height_ratios": [n_warm, n_cold, 8], "hspace": 0.04},
     sharex=True,
 )
 _plot_reads_on_ax(
-    axes[0], nv_reads, gene_segments, min_pos, max_pos, boundary_bp,
+    axes[0], warm_reads, gene_segments, min_pos, max_pos, boundary_bp,
     title=f"{ri_gene}   Warm  intron-retention reads",
 )
 _plot_reads_on_ax(
-    axes[1], c5_reads, gene_segments, min_pos, max_pos, boundary_bp,
+    axes[1], cold_reads, gene_segments, min_pos, max_pos, boundary_bp,
     title="Cold  intron-retention reads",
 )
 _draw_ri_gene_model(axes[2], gene_model, min_pos, max_pos, boundary_bp)
@@ -673,7 +673,7 @@ print(f"saved {stem.name}.png/.pdf")
 plt.show()
 
 plotted_rows = []
-for group, recs in (("Warm", nv_reads), ("Cold", c5_reads)):
+for group, recs in (("Warm", warm_reads), ("Cold", cold_reads)):
     for rec in recs:
         plotted_rows.append(
             {"group": group, "sample": rec["sample"], "read_id": rec["read_id"], "start": rec["start"], "end": rec["end"]}

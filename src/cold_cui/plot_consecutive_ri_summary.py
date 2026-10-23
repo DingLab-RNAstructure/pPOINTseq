@@ -255,41 +255,41 @@ def draw_barcode_panel(axis, rows: list[dict], n_intron: int, group: str) -> Non
 
 def write_panel_a(gene_id: str, barcode: pd.DataFrame, output_dir: Path) -> Path:
     """Write an Warm/Cold barcode figure in the same layout as summary panel a."""
-    nv_rows = barcode_rows(barcode.loc[barcode["group"].eq("Warm")])
-    c5_rows = barcode_rows(barcode.loc[barcode["group"].eq("Cold")])
-    if not nv_rows and not c5_rows:
+    warm_rows = barcode_rows(barcode.loc[barcode["group"].eq("Warm")])
+    cold_rows = barcode_rows(barcode.loc[barcode["group"].eq("Cold")])
+    if not warm_rows and not cold_rows:
         raise SystemExit(f"[ERROR] no barcode rows for {gene_id}")
-    n_intron = int(len((nv_rows or c5_rows)[0]["states"]))
+    n_intron = int(len((warm_rows or cold_rows)[0]["states"]))
     fig = plt.figure(figsize=(3.6, 5.5))
     grid = fig.add_gridspec(2, 1, hspace=0.18)
-    ax_nv = fig.add_subplot(grid[0])
-    ax_c5 = fig.add_subplot(grid[1], sharex=ax_nv)
-    if nv_rows:
-        draw_barcode_panel(ax_nv, nv_rows, n_intron, "Warm")
+    ax_warm = fig.add_subplot(grid[0])
+    ax_cold = fig.add_subplot(grid[1], sharex=ax_warm)
+    if warm_rows:
+        draw_barcode_panel(ax_warm, warm_rows, n_intron, "Warm")
     else:
-        ax_nv.set_axis_off()
-    if c5_rows:
-        draw_barcode_panel(ax_c5, c5_rows, n_intron, "Cold")
+        ax_warm.set_axis_off()
+    if cold_rows:
+        draw_barcode_panel(ax_cold, cold_rows, n_intron, "Cold")
     else:
-        ax_c5.set_axis_off()
-    ax_nv.set_xticks(np.arange(n_intron) + 0.5)
-    ax_nv.tick_params(labelbottom=False)
-    ax_c5.set_xticks(np.arange(n_intron) + 0.5)
-    ax_c5.set_xticklabels([str(i) for i in range(1, n_intron + 1)], fontsize=5.5)
-    ax_c5.set_xlabel("Intron (5′ → 3′)")
-    ax_nv.set_title(
-        f"{gene_id}   Warm {sum(r['is_consecutive'] for r in nv_rows)}/{len(nv_rows)}",
+        ax_cold.set_axis_off()
+    ax_warm.set_xticks(np.arange(n_intron) + 0.5)
+    ax_warm.tick_params(labelbottom=False)
+    ax_cold.set_xticks(np.arange(n_intron) + 0.5)
+    ax_cold.set_xticklabels([str(i) for i in range(1, n_intron + 1)], fontsize=5.5)
+    ax_cold.set_xlabel("Intron (5′ → 3′)")
+    ax_warm.set_title(
+        f"{gene_id}   Warm {sum(r['is_consecutive'] for r in warm_rows)}/{len(warm_rows)}",
         loc="left",
         fontsize=7,
         pad=2,
     )
-    ax_c5.set_title(
-        f"Cold {sum(r['is_consecutive'] for r in c5_rows)}/{len(c5_rows)}",
+    ax_cold.set_title(
+        f"Cold {sum(r['is_consecutive'] for r in cold_rows)}/{len(cold_rows)}",
         loc="left",
         fontsize=7,
         pad=2,
     )
-    ax_nv.text(-0.18, 1.08, "a", transform=ax_nv.transAxes, fontsize=8, fontweight="bold", ha="left", va="bottom")
+    ax_warm.text(-0.18, 1.08, "a", transform=ax_warm.transAxes, fontsize=8, fontweight="bold", ha="left", va="bottom")
     handles = [
         Patch(facecolor=STATE_COLORS[RETAINED], edgecolor="none", label="Retained"),
         Patch(facecolor=STATE_COLORS[SPLICED], edgecolor="none", label="Spliced"),
@@ -375,9 +375,9 @@ def plot_volcano(axis, gene_tbl: pd.DataFrame, panel_label: str = "d", point_siz
             color="#272727",
             arrowprops={"arrowstyle": "-", "lw": 0.4, "color": "#767676"},
         )
-    n_nv = int((gene_tbl["direction"] == "higher_consecutive_in_Warm").sum())
-    n_c5 = int((gene_tbl["direction"] == "higher_consecutive_in_Cold").sum())
-    axis.text(0.98, 0.96, f"Warm higher {n_nv}\nCold higher {n_c5}", transform=axis.transAxes, ha="right", va="top", fontsize=6)
+    n_warm = int((gene_tbl["direction"] == "higher_consecutive_in_Warm").sum())
+    n_cold = int((gene_tbl["direction"] == "higher_consecutive_in_Cold").sum())
+    axis.text(0.98, 0.96, f"Warm higher {n_warm}\nCold higher {n_cold}", transform=axis.transAxes, ha="right", va="top", fontsize=6)
     axis.set_xlim(-0.30, 0.68)
     axis.set_xlabel("Δ consecutive RI (Warm − Cold)")
     axis.set_ylabel(r"−log$_{10}$ padj")
@@ -426,32 +426,32 @@ def main() -> None:
     gene_tbl = pd.read_csv(args.gene_glm, sep="\t")
     required_columns(gene_tbl, {"gene_id", "delta_rate", "padj", "direction"}, args.gene_glm)
 
-    nv_rows = barcode_rows(barcode.loc[barcode["group"].eq("Warm")])
-    c5_rows = barcode_rows(barcode.loc[barcode["group"].eq("Cold")])
-    n_intron = int(len(nv_rows[0]["states"])) if nv_rows else int(len(c5_rows[0]["states"]))
+    warm_rows = barcode_rows(barcode.loc[barcode["group"].eq("Warm")])
+    cold_rows = barcode_rows(barcode.loc[barcode["group"].eq("Cold")])
+    n_intron = int(len(warm_rows[0]["states"])) if warm_rows else int(len(cold_rows[0]["states"]))
 
     fig = plt.figure(figsize=(7.2, 5.5))
     outer = fig.add_gridspec(1, 2, width_ratios=[1.05, 1.0], wspace=0.34)
     left = outer[0].subgridspec(2, 1, hspace=0.18)
     right = outer[1].subgridspec(3, 1, hspace=0.55)
-    ax_nv = fig.add_subplot(left[0])
-    ax_c5 = fig.add_subplot(left[1], sharex=ax_nv)
+    ax_warm = fig.add_subplot(left[0])
+    ax_cold = fig.add_subplot(left[1], sharex=ax_warm)
     ax_b = fig.add_subplot(right[0])
     ax_c = fig.add_subplot(right[1])
     ax_d = fig.add_subplot(right[2])
 
-    draw_barcode_panel(ax_nv, nv_rows, n_intron, "Warm")
-    draw_barcode_panel(ax_c5, c5_rows, n_intron, "Cold")
-    n_nv_consec = sum(row["is_consecutive"] for row in nv_rows)
-    n_c5_consec = sum(row["is_consecutive"] for row in c5_rows)
-    ax_nv.set_xticks(np.arange(n_intron) + 0.5)
-    ax_nv.tick_params(labelbottom=False)
-    ax_c5.set_xticks(np.arange(n_intron) + 0.5)
-    ax_c5.set_xticklabels([str(i) for i in range(1, n_intron + 1)], fontsize=5.5)
-    ax_c5.set_xlabel("Intron (5′ → 3′)")
-    ax_nv.set_title(f"{args.gene}   Warm {n_nv_consec}/{len(nv_rows)}", loc="left", fontsize=7, pad=2)
-    ax_c5.set_title(f"Cold {n_c5_consec}/{len(c5_rows)}", loc="left", fontsize=7, pad=2)
-    ax_nv.text(-0.18, 1.08, "a", transform=ax_nv.transAxes, fontsize=8, fontweight="bold", ha="left", va="bottom")
+    draw_barcode_panel(ax_warm, warm_rows, n_intron, "Warm")
+    draw_barcode_panel(ax_cold, cold_rows, n_intron, "Cold")
+    n_warm_consec = sum(row["is_consecutive"] for row in warm_rows)
+    n_cold_consec = sum(row["is_consecutive"] for row in cold_rows)
+    ax_warm.set_xticks(np.arange(n_intron) + 0.5)
+    ax_warm.tick_params(labelbottom=False)
+    ax_cold.set_xticks(np.arange(n_intron) + 0.5)
+    ax_cold.set_xticklabels([str(i) for i in range(1, n_intron + 1)], fontsize=5.5)
+    ax_cold.set_xlabel("Intron (5′ → 3′)")
+    ax_warm.set_title(f"{args.gene}   Warm {n_warm_consec}/{len(warm_rows)}", loc="left", fontsize=7, pad=2)
+    ax_cold.set_title(f"Cold {n_cold_consec}/{len(cold_rows)}", loc="left", fontsize=7, pad=2)
+    ax_warm.text(-0.18, 1.08, "a", transform=ax_warm.transAxes, fontsize=8, fontweight="bold", ha="left", va="bottom")
 
     plot_library(ax_b, sample_tbl, library_tests)
     plot_coupling(ax_c, pair_tbl)

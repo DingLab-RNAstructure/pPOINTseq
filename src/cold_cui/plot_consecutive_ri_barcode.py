@@ -45,7 +45,7 @@ import bootstrap
 bootstrap.setup(__file__)
 
 from project_config import REF_DIR, RESULT_DIRS, SAMPLES, classify_tsv
-from _find_nv_consec_c5_down import EXCLUDED_CLASSES, consecutive_pairs, longest_run
+from _find_warm_consec_cold_down import EXCLUDED_CLASSES, consecutive_pairs, longest_run
 from plot_classified_gene_reads import read_gene_model
 
 # ============================================================
@@ -364,15 +364,15 @@ def plot_gene_barcode(
     """Write Warm/Cold barcodes and a per-read source table."""
     by_group = {name: [row for row in encoded if row["group"] == name] for name in ("Warm", "Cold")}
     plotted = {name: rank_and_cap(rows, max_reads) for name, rows in by_group.items()}
-    n_nv = max(len(plotted["Warm"]), 1)
-    n_c5 = max(len(plotted["Cold"]), 1)
+    n_warm = max(len(plotted["Warm"]), 1)
+    n_cold = max(len(plotted["Cold"]), 1)
     width = min(7.2, max(3.6, 0.28 * n_intron + 1.6))
-    height = min(4.2, max(2.0, row_height * (n_nv + n_c5) + 1.05))
+    height = min(4.2, max(2.0, row_height * (n_warm + n_cold) + 1.05))
     fig, axes = plt.subplots(
         2,
         1,
         figsize=(width, height),
-        gridspec_kw={"height_ratios": [n_nv, n_c5], "hspace": 0.12},
+        gridspec_kw={"height_ratios": [n_warm, n_cold], "hspace": 0.12},
         sharex=True,
     )
     draw_barcode(axes[0], plotted["Warm"], n_intron, f"{gene_id}   Warm")
@@ -435,12 +435,12 @@ def main() -> None:
             print(f"[WARN] no classified reads for {gene_id}", file=sys.stderr)
             continue
         encoded = [encode_read(row, n_intron) for row in raw.itertuples(index=False)]
-        n_consec_nv = sum(row["is_consecutive"] and row["group"] == "Warm" for row in encoded)
-        n_consec_c5 = sum(row["is_consecutive"] and row["group"] == "Cold" for row in encoded)
+        n_consec_warm = sum(row["is_consecutive"] and row["group"] == "Warm" for row in encoded)
+        n_consec_cold = sum(row["is_consecutive"] and row["group"] == "Cold" for row in encoded)
         print(
             f"[INFO] {gene_id} introns={n_intron} "
-            f"Warm={sum(r['group']=='Warm' for r in encoded)} (consec {n_consec_nv}) "
-            f"Cold={sum(r['group']=='Cold' for r in encoded)} (consec {n_consec_c5})",
+            f"Warm={sum(r['group']=='Warm' for r in encoded)} (consec {n_consec_warm}) "
+            f"Cold={sum(r['group']=='Cold' for r in encoded)} (consec {n_consec_cold})",
             file=sys.stderr,
         )
         plot_gene_barcode(
